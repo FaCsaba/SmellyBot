@@ -12,14 +12,10 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "@types/pg": "^8.11.8",
-    "drizzle-kit": "^0.24.2",
     "typescript": "^5.5.4"
   },
   "dependencies": {
     "discord.js": "^14.16.1",
-    "dotenv": "^16.4.5",
-    "drizzle-orm": "^0.33.0",
-    "pg": "^8.12.0"
+    "dotenv": "^16.4.5"
   }
 }
