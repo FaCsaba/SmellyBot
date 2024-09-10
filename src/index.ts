@@ -8,7 +8,7 @@ if (TOKEN === undefined) throw new Error("TOKEN not found in your .env file!");
 const CLIENT_ID = process.env['CLIENT_ID']!
 if (CLIENT_ID === undefined) throw new Error("CLIENT_ID not found in your .env file!");
 
-const db = new DB("smelly.db");
+const db = new DB("db/smelly.db");
 
 const CommandRegisterSmellyChannel = new SlashCommandBuilder()
     .setName("register_smelly_channel")

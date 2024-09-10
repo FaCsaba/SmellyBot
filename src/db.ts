@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "path";
 
 export type ChannelId = string;
 export type UserId = string;
@@ -15,6 +16,10 @@ export class DB {
 
     constructor(public filePath: string, public readonly flushToStorageMs: number = 1000 * 60 * 60) {
         this.readFromDisk();
+        if (!fs.existsSync(filePath)) {
+            const dirname = path.dirname(filePath)   
+            fs.mkdirSync(dirname, { recursive: true });
+        }
         setInterval(() => this.saveToDisk(), flushToStorageMs);
     }
 
@@ -41,7 +46,7 @@ export class DB {
             const a = fs.readFileSync(this.filePath, 'utf-8')
             this.data = JSON.parse(a);
         } catch (error) {
-            console.error(error);
+            console.error("Failed to open file, defaulting to initial values.", error);
         }
     }
 }
