@@ -67,7 +67,7 @@ async function main() {
             const smelly_boys = Object.values(db.data.users).sort((a, b) => b.count - a.count);
             const idxToPlace = (idx: number) => [":first_place:", ":second_place:", "third_place:"][idx] ?? `${idx}:`;
             const desc = smelly_boys.reduce((prev, curr, currIdx) => {
-                return prev + `${idxToPlace(currIdx)} <@${curr.id}> ${curr.count}`;
+                return prev + `${idxToPlace(currIdx)} <@${curr.id}> ${curr.count}\n`;
             }, "") || null;
             const embed = new EmbedBuilder()
                 .setTitle("Smelliest boys!")
