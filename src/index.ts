@@ -42,7 +42,7 @@ async function registerCommands() {
 }
 
 function idxToPlace(idx: number): string {
-    return [":first_place:", ":second_place:", ":third_place:"][idx] ?? `${idx}:`;
+    return [":first_place:", ":second_place:", ":third_place:"][idx] ?? `${idx+1}:`;
 }
 
 async function main() {
