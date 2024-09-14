@@ -26,6 +26,7 @@ export class DB {
     public addChannel(channel: ChannelId) {
         console.log("Adding channel", channel);
         if (!(channel in this.data.channels)) this.data.channels.push(channel);
+        this.saveToDisk();
     }
 
     public removeChannel(channel: ChannelId) {
@@ -36,6 +37,7 @@ export class DB {
     public addOrUpdateUser(user: User) {
         console.log("Adding user", user);
         this.data.users[user.id] = user;
+        this.saveToDisk();
     }
 
     public saveToDisk(): void {
