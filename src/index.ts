@@ -17,18 +17,34 @@ const CommandRegisterSmellyChannel = new SlashCommandBuilder()
         option
             .setName("smelly_channel")
             .setRequired(true)
-            .setDescription("the channel to register as the smelly one")
+            .setDescription("The channel to register as the smelly one.")
             .addChannelTypes(ChannelType.GuildVoice))
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
 const CommandListSmellyBoys = new SlashCommandBuilder()
     .setName("list_smelly_boys")
-    .setDescription("Lists all the smelly boys who banised to the locker");
+    .setDescription("Lists all the smelly boys who banised to the locker.");
+
+const CommandSetSmellyCount = new SlashCommandBuilder()
+    .setName("set_smelly_count")
+    .setDescription("Set a user's smelly count.")
+    .addUserOption(option =>
+        option
+            .setName("user")
+            .setRequired(true)
+            .setDescription("The user to set the count to."))
+    .addIntegerOption(option =>
+        option
+            .setName("count")
+            .setRequired(true)
+            .setDescription("The specified smelly count."))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
 const commands = [
-    CommandRegisterSmellyChannel.toJSON(),
-    CommandListSmellyBoys.toJSON()
-];
+    CommandRegisterSmellyChannel,
+    CommandListSmellyBoys,
+    CommandSetSmellyCount
+].map(c => c.toJSON());
 
 async function registerCommands() {
     const rest = new REST({ version: '10' }).setToken(TOKEN);
@@ -72,8 +88,22 @@ async function main() {
             const embed = new EmbedBuilder()
                 .setTitle("Smelliest boys!")
                 .setDescription(desc);
-            
+
             await interaction.editReply({ embeds: [embed], content: "" });
+        }
+
+        if (interaction.commandName === CommandSetSmellyCount.name) {
+            await interaction.deferReply({ ephemeral: true });
+
+            const userId = interaction.options.getUser("user", true).id;
+            const count = interaction.options.getInteger("count", true);
+
+            const user = db.data.users[userId] ?? { id: userId };
+            user.count = count;
+
+            db.addOrUpdateUser(user);
+
+            await interaction.editReply({ content: `Set <@${userId}>'s smelly count to ${count}.`});
         }
     });
 
@@ -83,7 +113,7 @@ async function main() {
             if (user !== undefined) {
                 db.addOrUpdateUser({ id: state.id, count: user.count + 1 })
             } else {
-                db.addOrUpdateUser({ id: state.id, count: 1});
+                db.addOrUpdateUser({ id: state.id, count: 1 });
             }
         }
     });
