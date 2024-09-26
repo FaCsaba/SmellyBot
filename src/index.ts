@@ -57,6 +57,10 @@ async function registerCommands() {
     }
 }
 
+function idxToPlace(idx: number): string {
+    return [":first_place:", ":second_place:", ":third_place:"][idx] ?? `${idx+1}:`;
+}
+
 async function main() {
     await registerCommands();
     const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
@@ -81,9 +85,8 @@ async function main() {
             await interaction.deferReply();
 
             const smelly_boys = Object.values(db.data.users).sort((a, b) => b.count - a.count);
-            const idxToPlace = (idx: number) => [":first_place:", ":second_place:", "third_place:"][idx] ?? `${idx}:`;
             const desc = smelly_boys.reduce((prev, curr, currIdx) => {
-                return prev + `${idxToPlace(currIdx)} <@${curr.id}> ${curr.count}`;
+                return prev + `${idxToPlace(currIdx)} <@${curr.id}> ${curr.count}\n`;
             }, "") || null;
             const embed = new EmbedBuilder()
                 .setTitle("Smelliest boys!")
