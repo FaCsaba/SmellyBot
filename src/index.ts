@@ -86,7 +86,7 @@ async function main() {
 
             const smelly_boys = Object.values(db.data.users).sort((a, b) => b.count - a.count);
             const desc = smelly_boys.reduce((prev, curr, currIdx) => {
-                return prev + `${idxToPlace(currIdx)} <@${curr.id}> ${curr.count}\n`;
+                return prev + `${idxToPlace(currIdx)} <@!${curr.id}> ${curr.count}\n`;
             }, "") || null;
             const embed = new EmbedBuilder()
                 .setTitle("Smelliest boys!")
@@ -106,7 +106,7 @@ async function main() {
 
             db.addOrUpdateUser(user);
 
-            await interaction.editReply({ content: `Set <@${userId}>'s smelly count to ${count}.`});
+            await interaction.editReply({ content: `Set <@!${userId}>'s smelly count to ${count}.`});
         }
     });
 
