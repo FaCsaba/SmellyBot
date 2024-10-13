@@ -1,6 +1,6 @@
-import { ChannelType, Client, EmbedBuilder, GatewayIntentBits, PermissionFlagsBits, PermissionsBitField, REST, Routes, SlashCommandBuilder } from 'discord.js';
+import { ChannelType, Client, EmbedBuilder, GatewayIntentBits, PermissionFlagsBits, REST, Routes, SlashCommandBuilder } from 'discord.js';
 import dotenv from "dotenv";
-import { DB, User } from './db';
+import { DB } from './db';
 
 dotenv.config();
 const TOKEN = process.env['TOKEN']!
@@ -18,6 +18,17 @@ const CommandRegisterSmellyChannel = new SlashCommandBuilder()
             .setName("smelly_channel")
             .setRequired(true)
             .setDescription("The channel to register as the smelly one.")
+            .addChannelTypes(ChannelType.GuildVoice))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
+
+const CommandRegisterShowerChannel = new SlashCommandBuilder()
+    .setName("register_shower_channel")
+    .setDescription("Sets the channel that shall wash the sins of those stepping inside.")
+    .addChannelOption(option =>
+        option
+            .setName("shower_channel")
+            .setRequired(true)
+            .setDescription("The channel that shall cleanse the wicked of sins told by the smelly channel.")
             .addChannelTypes(ChannelType.GuildVoice))
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
@@ -42,6 +53,7 @@ const CommandSetSmellyCount = new SlashCommandBuilder()
 
 const commands = [
     CommandRegisterSmellyChannel,
+    CommandRegisterShowerChannel,
     CommandListSmellyBoys,
     CommandSetSmellyCount
 ].map(c => c.toJSON());
@@ -58,7 +70,7 @@ async function registerCommands() {
 }
 
 function idxToPlace(idx: number): string {
-    return [":first_place:", ":second_place:", ":third_place:"][idx] ?? `${idx+1}:`;
+    return [":first_place:", ":second_place:", ":third_place:"][idx] ?? `${idx + 1}:`;
 }
 
 async function main() {
@@ -81,10 +93,19 @@ async function main() {
             await interaction.editReply({ content: `Registered <#${channelId}> as the smelly channel.` });
         }
 
+        if (interaction.commandName === CommandRegisterShowerChannel.name) {
+            await interaction.deferReply({ ephemeral: true });
+
+            const channelId = interaction.options.getChannel("shower_channel")!.id;
+            db.addShowerChannel(channelId);
+
+            await interaction.editReply({ content: `Registered <#${channelId}> as the shower channel.` });
+        }
+
         if (interaction.commandName === CommandListSmellyBoys.name) {
             await interaction.deferReply();
 
-            const smelly_boys = Object.values(db.data.users).sort((a, b) => b.count - a.count);
+            const smelly_boys = Object.values(db.data.users).filter(user => user.count > 0).sort((a, b) => b.count - a.count);
             const desc = smelly_boys.reduce((prev, curr, currIdx) => {
                 return prev + `${idxToPlace(currIdx)} <@!${curr.id}> ${curr.count}\n`;
             }, "") || null;
@@ -101,22 +122,35 @@ async function main() {
             const userId = interaction.options.getUser("user", true).id;
             const count = interaction.options.getInteger("count", true);
 
-            const user = db.data.users[userId] ?? { id: userId };
+            const user = db.data.users[userId] ?? { id: userId, count: 0 };
             user.count = count;
 
             db.addOrUpdateUser(user);
 
-            await interaction.editReply({ content: `Set <@!${userId}>'s smelly count to ${count}.`});
+            await interaction.editReply({ content: `Set <@!${userId}>'s smelly count to ${count}.` });
         }
     });
 
     client.on('voiceStateUpdate', async (_, state) => {
-        if (state.channelId && db.data.channels.includes(state.channelId)) {
-            const user: User | undefined = db.data.users[state.id]
+        if (!state.channelId) return;
+
+        if (db.data.channels.includes(state.channelId)) {
+            const user = db.data.users[state.id]
             if (user !== undefined) {
                 db.addOrUpdateUser({ id: state.id, count: user.count + 1 })
             } else {
                 db.addOrUpdateUser({ id: state.id, count: 1 });
+            }
+        }
+
+        if (db.data.showerChannels.includes(state.channelId)) {
+            const user = db.data.users[state.id];
+            if (user !== undefined) {
+                const count = user.count - 1;
+                if (count < 0) return;
+                db.addOrUpdateUser({ id: state.id, count });
+            } else {
+                db.addOrUpdateUser({ id: state.id, count: 0 });
             }
         }
     });
