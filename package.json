@@ -4,6 +4,7 @@
   "main": "out/index.js",
   "scripts": {
     "build": "tsc",
+    "watch": "tsc --watch",
     "start": "node ."
   },
   "author": "",

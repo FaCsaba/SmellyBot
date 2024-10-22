@@ -1,4 +1,4 @@
-import { ChannelType, Client, EmbedBuilder, GatewayIntentBits, PermissionFlagsBits, REST, Routes, SlashCommandBuilder } from 'discord.js';
+import { ApplicationCommandType, ChannelType, Client, ContextMenuCommandBuilder, EmbedBuilder, Events, GatewayIntentBits, InteractionContextType, PermissionFlagsBits, REST, Routes, SlashCommandBuilder } from 'discord.js';
 import dotenv from "dotenv";
 import { DB } from './db';
 
@@ -51,11 +51,28 @@ const CommandSetSmellyCount = new SlashCommandBuilder()
             .setDescription("The specified smelly count."))
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
+const CommandPasswords = new SlashCommandBuilder()
+    .setName("passwords")
+    .setDescription("Get a list of registered passwords");
+
+const CommandRegisterPassword = new ContextMenuCommandBuilder()
+    .setName("register_password")
+    .setType(ApplicationCommandType.Message)
+    .setContexts(InteractionContextType.Guild);
+
+const CommandRemovePassword = new ContextMenuCommandBuilder()
+    .setName("remove_password")
+    .setType(ApplicationCommandType.Message)
+    .setContexts(InteractionContextType.Guild);
+
 const commands = [
     CommandRegisterSmellyChannel,
     CommandRegisterShowerChannel,
     CommandListSmellyBoys,
-    CommandSetSmellyCount
+    CommandSetSmellyCount,
+    CommandPasswords,
+    CommandRegisterPassword,
+    CommandRemovePassword,
 ].map(c => c.toJSON());
 
 async function registerCommands() {
@@ -81,57 +98,103 @@ async function main() {
         console.log(`Logged in as ${client.user?.tag}!`);
     });
 
-    client.on('interactionCreate', async interaction => {
-        if (!interaction.isChatInputCommand()) return;
+    client.on(Events.InteractionCreate, async interaction => {
+        if (interaction.isMessageContextMenuCommand()) {
+            if (interaction.commandName === CommandRegisterPassword.name) {
+                await interaction.deferReply();
 
-        if (interaction.commandName === CommandRegisterSmellyChannel.name) {
-            await interaction.deferReply({ ephemeral: true });
+                const password = interaction.targetMessage.content;
+                const messageId = interaction.targetMessage.id;
+                const userId = interaction.targetMessage.author.id;
 
-            const channelId = interaction.options.getChannel("smelly_channel")!.id;
-            db.addChannel(channelId);
+                db.addPassword(userId, messageId, password);
 
-            await interaction.editReply({ content: `Registered <#${channelId}> as the smelly channel.` });
-        }
+                await interaction.editReply({ content: `Registered new password: \`${password}\`.` });
+            } else if (interaction.commandName === CommandRemovePassword.name) {
+                await interaction.deferReply();
 
-        if (interaction.commandName === CommandRegisterShowerChannel.name) {
-            await interaction.deferReply({ ephemeral: true });
+                const password = interaction.targetMessage.content;
+                const messageId = interaction.targetMessage.id;
+                db.removePassword(messageId);
 
-            const channelId = interaction.options.getChannel("shower_channel")!.id;
-            db.addShowerChannel(channelId);
+                await interaction.editReply({ content: `Removed \`${password}\` from password list.` });
+            }
+        } else if (interaction.isChatInputCommand()) {
+            if (interaction.commandName === CommandRegisterSmellyChannel.name) {
+                await interaction.deferReply({ ephemeral: true });
 
-            await interaction.editReply({ content: `Registered <#${channelId}> as the shower channel.` });
-        }
+                const channelId = interaction.options.getChannel("smelly_channel")!.id;
+                db.addChannel(channelId);
 
-        if (interaction.commandName === CommandListSmellyBoys.name) {
-            await interaction.deferReply();
+                await interaction.editReply({ content: `Registered <#${channelId}> as the smelly channel.` });
+            }
 
-            const smelly_boys = Object.values(db.data.users).filter(user => user.count > 0).sort((a, b) => b.count - a.count);
-            const desc = smelly_boys.reduce((prev, curr, currIdx) => {
-                return prev + `${idxToPlace(currIdx)} <@!${curr.id}> ${curr.count}\n`;
-            }, "") || null;
-            const embed = new EmbedBuilder()
-                .setTitle("Smelliest boys!")
-                .setDescription(desc);
+            if (interaction.commandName === CommandRegisterShowerChannel.name) {
+                await interaction.deferReply({ ephemeral: true });
 
-            await interaction.editReply({ embeds: [embed], content: "" });
-        }
+                const channelId = interaction.options.getChannel("shower_channel")!.id;
+                db.addShowerChannel(channelId);
 
-        if (interaction.commandName === CommandSetSmellyCount.name) {
-            await interaction.deferReply({ ephemeral: true });
+                await interaction.editReply({ content: `Registered <#${channelId}> as the shower channel.` });
+            }
 
-            const userId = interaction.options.getUser("user", true).id;
-            const count = interaction.options.getInteger("count", true);
+            if (interaction.commandName === CommandListSmellyBoys.name) {
+                await interaction.deferReply();
 
-            const user = db.data.users[userId] ?? { id: userId, count: 0 };
-            user.count = count;
+                const smelly_boys = Object.values(db.data.users).filter(user => user.count > 0).sort((a, b) => b.count - a.count);
+                const desc = smelly_boys.reduce((prev, curr, currIdx) => {
+                    return prev + `${idxToPlace(currIdx)} <@!${curr.id}> ${curr.count}\n`;
+                }, "") || "No smelly boys yet!";
+                const embed = new EmbedBuilder()
+                    .setTitle("Smelliest boys!")
+                    .setDescription(desc);
 
-            db.addOrUpdateUser(user);
+                await interaction.editReply({ embeds: [embed], content: "" });
+            }
 
-            await interaction.editReply({ content: `Set <@!${userId}>'s smelly count to ${count}.` });
+            if (interaction.commandName === CommandSetSmellyCount.name) {
+                await interaction.deferReply({ ephemeral: true });
+
+                const userId = interaction.options.getUser("user", true).id;
+                const count = interaction.options.getInteger("count", true);
+
+                const user = db.data.users[userId] ?? { id: userId, count: 0 };
+                user.count = count;
+
+                db.addOrUpdateUser(user);
+
+                await interaction.editReply({ content: `Set <@!${userId}>'s smelly count to ${count}.` });
+            }
+
+            if (interaction.commandName === CommandPasswords.name) {
+                await interaction.deferReply();
+
+                let description = db.data.passwords.reduce((prev, curr, currIdx) => {
+                    return prev + `${currIdx + 1} <@!${curr.userId}>: ${curr.password}\n`;
+                }, "") || "No passwords yet!";
+
+                if (db.data.passwords.length > 0) {
+                    const userToPasswordCount = db.data.passwords.reduce((prev: Record<string, number>, curr) => {
+                        prev[curr.userId] = (prev[curr.userId] ?? 0) + 1;
+                        return prev;
+                    }, {});
+                    const userToPasswordCountArray = Object.entries(userToPasswordCount);
+                    const [userId, count] = userToPasswordCountArray.reduce(([userId1, count1], [userId2, count2]) => {
+                        if (count1 > count2) return [userId1, count1];
+                        return [userId2, count2];
+                    }, userToPasswordCountArray[0]!);
+                    description += `\nMost passwords by: <@!${userId}>, they made ${count} passwords.`;
+                }
+                const embed = new EmbedBuilder()
+                    .setTitle("Passwords:")
+                    .setDescription(description);
+
+                await interaction.editReply({ embeds: [embed], content: "" });
+            }
         }
     });
 
-    client.on('voiceStateUpdate', async (_, state) => {
+    client.on(Events.VoiceStateUpdate, async (_, state) => {
         if (!state.channelId) return;
 
         if (db.data.channels.includes(state.channelId)) {

@@ -3,7 +3,10 @@ import path from "path";
 
 export type ChannelId = string;
 export type UserId = string;
-export type User = { id: UserId, count: number };
+export type MessageId = string;
+export type Password = string;
+export type User = { id: UserId; count: number; };
+export type UserGeneratedPassword = { userId: UserId; messageId: MessageId, password: Password; }
 
 export type SchemaV1 = {
     version: 1;
@@ -18,12 +21,20 @@ export type SchemaV2 = {
     users: Record<UserId, User>;
 }
 
-export type Schema = SchemaV1 | SchemaV2;
+export type SchemaV3 = {
+    version: 3;
+    channels: ChannelId[];
+    showerChannels: ChannelId[];
+    users: Record<UserId, User>;
+    passwords: UserGeneratedPassword[];
+}
+
+export type Schema = SchemaV1 | SchemaV2 | SchemaV3;
 
 export class DB {
-    public data: SchemaV2 = { version: 2, channels: [], showerChannels: [], users: {} };
+    public data: SchemaV3 = { version: 3, channels: [], showerChannels: [], users: {}, passwords: [] };
 
-    constructor(public filePath: string, public readonly flushToStorageMs: number = 1000 * 60 * 60) {
+    constructor(public filePath: string) {
         this.readFromDisk();
         if (!fs.existsSync(filePath)) {
             const dirname = path.dirname(filePath)
@@ -49,6 +60,18 @@ export class DB {
         this.saveToDisk();
     }
 
+    public addPassword(userId: UserId, messageId: MessageId, password: Password) {
+        console.log("Adding password", password);
+        this.data.passwords.push({ userId, messageId, password });
+        this.saveToDisk();
+    }
+
+    public removePassword(messageId: MessageId) {
+        console.log("Removing password with messageId", messageId);
+        this.data.passwords = this.data.passwords.filter((password) => password.messageId !== messageId);
+        this.saveToDisk();
+    }
+
     public saveToDisk(): void {
         console.log("Saving to disk...");
         fs.writeFileSync(this.filePath, JSON.stringify(this.data));
@@ -68,6 +91,11 @@ export class DB {
                 this.data.channels = data.channels ?? [];
                 this.data.showerChannels = data.showerChannels ?? [];
                 this.data.users = data.users ?? {};
+            } else if (data.version === 3) {
+                this.data.channels = data.channels ?? [];
+                this.data.showerChannels = data.showerChannels ?? [];
+                this.data.users = data.users ?? {};
+                this.data.passwords = data.passwords ?? [];
             } else {
                 throw new Error("Unknown db file version.");
             }
